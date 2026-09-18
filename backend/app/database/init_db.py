@@ -93,8 +93,8 @@ def seed_knowledge_base(db_session: Session, force: bool = False) -> Dict[str, A
     verified_files = [
         source_path / "fao" / "fao_soil_biodiversity_report_2020.md",
         source_path / "ipcc" / "ipcc_srccl_land_degradation_2019.md",
-        source_path / "research" / "torralba_2016_agroforestry_biodiversity.pdf",
     ]
+    
 
     pipeline = IngestionPipeline(db_session=db_session)
     total_chunks = 0
