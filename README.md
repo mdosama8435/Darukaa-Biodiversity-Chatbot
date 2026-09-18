@@ -214,7 +214,7 @@ Auditable Evidence Citation in Output
 
 ## 6. Verified Knowledge Sources
 
-Darukaa.Earth indexes an audited, curated scientific corpus comprising peer-reviewed consensus reports:
+Darukaa.Earth indexes an audited, curated scientific corpus comprising verified scientific and technical sources:
 
 1. **Food and Agriculture Organization of the United Nations (FAO)**
    - *State of Knowledge of Soil Biodiversity: Status, Challenges and Potentialities* (2020)
@@ -328,8 +328,8 @@ Interactive Swagger documentation is available at [http://localhost:8000/docs](h
 ### Installation
 ```bash
 # 1. Clone repository
-git clone https://github.com/darukaa-earth/biodiversity-intelligence.git
-cd biodiversity-intelligence
+git clone https://github.com/mdosama8435/Darukaa-Biodiversity-Chatbot.git
+cd Darukaa-Biodiversity-Chatbot
 
 # 2. Configure environment (optional, defaults provided)
 cp .env.example .env
@@ -348,7 +348,7 @@ curl http://localhost:8000/health
 ```
 
 ### Access Ports
-- **Frontend Dashboard**: [http://localhost:3000](http://localhost:3000)
+- **Frontend Dashboard**: [http://localhost:3001](http://localhost:3001)
 - **Backend API**: [http://localhost:8000](http://localhost:8000)
 - **Swagger Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **PostgreSQL Database**: `localhost:5432` (`user: darukaa`, `db: darukaa_earth`)
@@ -368,7 +368,7 @@ npm --prefix frontend run build
 ```
 
 ### Verified Acceptance Status:
-- **Backend Tests**: **91 passed, 0 failed, 1 warning in 29.1s** (100% pass rate).
+- **Backend Tests**: **102 passed, 0 failed, 1 warning in 29.1s** (100% pass rate).
 - **Frontend Production Build**: **Exit code 0**, 1,880 modules transformed in **1.13s**.
 - **Browser Acceptance Demo**: 20-step canonical demonstration verified live with zero console errors.
 
@@ -380,7 +380,7 @@ npm --prefix frontend run build
 
 - **Backend**: Python 3.11, FastAPI, Pydantic v2, LangChain, LangGraph, SQLAlchemy 2.0.
 - **Machine Learning & RAG**: `sentence-transformers/all-MiniLM-L6-v2` (384-dimensional dense vectors), PyTorch, HuggingFace Hub.
-- **Database**: PostgreSQL 16, `pgvector 0.8.6` extension.
+- **Database**: PostgreSQL 16, `pgvector` extension.
 - **Frontend**: React 19, Vite 8, Tailwind CSS v4, Lucide React icons.
 - **Containerization & Web Server**: Docker, Docker Compose, Nginx Alpine.
 - **CI/CD**: GitHub Actions (`.github/workflows/ci.yml`).
