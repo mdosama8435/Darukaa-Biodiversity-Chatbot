@@ -1,0 +1,42 @@
+[
+  {
+    "id": "eval_q_01",
+    "query": "What is the relationship between soil organic carbon and soil biodiversity?",
+    "target_variables": ["soil_organic_carbon", "species_richness"],
+    "target_topics": ["soil", "biodiversity"],
+    "expected_sources": ["FAO", "Research Paper"],
+    "relevance_criteria": "Retrieves findings establishing that elevated soil organic carbon fuels microbial biomass, saprophytic fungi, and macrofauna richness."
+  },
+  {
+    "id": "eval_q_02",
+    "query": "How can agricultural land use and agroforestry practices affect biodiversity and habitat diversity?",
+    "target_variables": ["land_use", "species_richness", "habitat_diversity"],
+    "target_topics": ["agriculture", "biodiversity", "ecosystem"],
+    "expected_sources": ["Research Paper", "FAO"],
+    "relevance_criteria": "Retrieves evidence demonstrating that agroforestry and diversified cropping enhance floral/faunal species richness by 20% to 45% relative to monocultures."
+  },
+  {
+    "id": "eval_q_03",
+    "query": "How does rainfall variability and drought intensity influence soil moisture and land degradation?",
+    "target_variables": ["rainfall", "soil_moisture", "deforestation"],
+    "target_topics": ["climate", "land", "water"],
+    "expected_sources": ["IPCC", "FAO"],
+    "relevance_criteria": "Retrieves assessments describing how drought intervals deplete root-zone soil moisture and cause vegetative dieback, accelerating soil erosion."
+  },
+  {
+    "id": "eval_q_04",
+    "query": "What are the impacts of temperature stress and warming on soil organic carbon decomposition?",
+    "target_variables": ["temperature", "soil_organic_carbon"],
+    "target_topics": ["climate", "soil"],
+    "expected_sources": ["IPCC"],
+    "relevance_criteria": "Retrieves findings showing that elevated ambient temperatures accelerate microbial respiration and thermal oxidation of topsoil carbon."
+  },
+  {
+    "id": "eval_q_05",
+    "query": "What is the relationship between soil pH extremes and microbial community diversity or nutrient cycling?",
+    "target_variables": ["soil_ph", "species_richness"],
+    "target_topics": ["soil", "biodiversity"],
+    "expected_sources": ["FAO"],
+    "relevance_criteria": "Retrieves edaphic findings indicating optimal microbial activity occurs between pH 6.0 and 7.5, whereas acidification (< 5.0) sharply inhibits bacterial diversity."
+  }
+]

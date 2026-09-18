@@ -1,0 +1,30 @@
+{
+  "title": "State of Knowledge of Soil Biodiversity: Status, Challenges and Potentialities (Report Excerpt)",
+  "source": "FAO",
+  "document_type": "report",
+  "publication_year": 2020,
+  "authors": [
+    "Food and Agriculture Organization of the United Nations (FAO)",
+    "Intergovernmental Technical Panel on Soils (ITPS)",
+    "Global Soil Biodiversity Initiative (GSBI)",
+    "Convention on Biological Diversity (CBD)"
+  ],
+  "doi": "10.4060/cb1924en",
+  "journal": null,
+  "url": "https://doi.org/10.4060/cb1924en",
+  "license": "CC BY-NC-SA 3.0 IGO",
+  "geographic_scope": "global",
+  "topics": [
+    "soil",
+    "biodiversity",
+    "water",
+    "ecosystem",
+    "agriculture"
+  ],
+  "variables": [
+    "soil_organic_carbon",
+    "soil_ph",
+    "soil_moisture",
+    "species_richness"
+  ]
+}

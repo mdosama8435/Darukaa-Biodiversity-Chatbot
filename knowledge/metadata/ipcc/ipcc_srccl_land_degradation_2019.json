@@ -1,0 +1,31 @@
+{
+  "title": "IPCC Special Report on Climate Change and Land: Chapter 4 — Land Degradation (Assessment Excerpt)",
+  "source": "IPCC",
+  "document_type": "report",
+  "publication_year": 2019,
+  "authors": [
+    "Intergovernmental Panel on Climate Change (IPCC)"
+  ],
+  "doi": "10.1017/9781009157988.006",
+  "journal": null,
+  "url": "https://www.ipcc.ch/srccl/chapter/chapter-4/",
+  "license": "Open Access Assessment",
+  "geographic_scope": "global",
+  "topics": [
+    "climate",
+    "land",
+    "soil",
+    "water",
+    "human_impact",
+    "ecosystem"
+  ],
+  "variables": [
+    "temperature",
+    "rainfall",
+    "soil_moisture",
+    "soil_organic_carbon",
+    "deforestation",
+    "land_cover",
+    "land_use"
+  ]
+}
