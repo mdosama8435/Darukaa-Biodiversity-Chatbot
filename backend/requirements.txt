@@ -23,4 +23,4 @@ httpx>=0.27.0
 
 # Scientific Ingestion & Embeddings
 pypdf>=4.0.0
-sentence-transformers>=2.6.0
+fastembed>=0.7.0

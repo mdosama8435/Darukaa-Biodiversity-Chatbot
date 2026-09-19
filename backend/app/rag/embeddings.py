@@ -1,8 +1,7 @@
-"""Embedding service abstraction and SentenceTransformer implementation with strict dimension validation."""
+"""Lightweight ONNX embedding service with strict dimension validation."""
 
 from abc import ABC, abstractmethod
 from typing import List, Optional
-import numpy as np
 
 from app.config import settings
 
@@ -13,22 +12,24 @@ class BaseEmbeddingService(ABC):
     @property
     @abstractmethod
     def dimension(self) -> int:
-        """Returns the vector dimensionality of this embedding service."""
         pass
 
     @abstractmethod
     def embed_texts(self, texts: List[str]) -> List[List[float]]:
-        """Generates dense vector embeddings for a list of texts."""
         pass
 
     @abstractmethod
     def embed_query(self, query: str) -> List[float]:
-        """Generates a dense vector embedding for a search query."""
         pass
 
 
 class SentenceTransformerEmbeddingService(BaseEmbeddingService):
-    """Generates embeddings using open-source models via sentence-transformers."""
+    """
+    Compatibility class name retained for existing imports/tests.
+
+    Actual inference uses FastEmbed/ONNX instead of
+    sentence-transformers/PyTorch to keep Render memory usage low.
+    """
 
     def __init__(
         self,
@@ -38,45 +39,63 @@ class SentenceTransformerEmbeddingService(BaseEmbeddingService):
         self.model_name = model_name or settings.EMBEDDING_MODEL
         self.expected_dimension = expected_dimension or settings.EMBEDDING_DIMENSION
 
-        from sentence_transformers import SentenceTransformer
+        from fastembed import TextEmbedding
 
-        # Load the sentence-transformer model
-        self.model = SentenceTransformer(self.model_name)
+        self.model = TextEmbedding(model_name=self.model_name)
 
-        # Validate actual output dimension against expected dimension
-        probe = self.model.encode(["probe validation"], normalize_embeddings=True)
-        self._dimension = probe.shape[1]
+        probe = list(self.model.embed(["probe validation"], batch_size=1))
 
-        if self.expected_dimension is not None and self._dimension != self.expected_dimension:
+        if not probe:
+            raise ValueError("Embedding model returned no vector during validation.")
+
+        self._dimension = len(probe[0])
+
+        if (
+            self.expected_dimension is not None
+            and self._dimension != self.expected_dimension
+        ):
             raise ValueError(
-                f"Embedding dimension mismatch: configured EMBEDDING_DIMENSION={self.expected_dimension}, "
-                f"but model '{self.model_name}' produces vectors of dimension {self._dimension}. "
-                "Embeddings cannot be silently truncated or padded. Update configuration to match model."
+                f"Embedding dimension mismatch: "
+                f"configured EMBEDDING_DIMENSION={self.expected_dimension}, "
+                f"but model '{self.model_name}' produces vectors of "
+                f"dimension {self._dimension}. "
+                "Embeddings cannot be silently truncated or padded."
             )
 
     @property
     def dimension(self) -> int:
         return self._dimension
 
-    def embed_texts(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
-        """Embeds a batch of texts with L2 normalization for exact cosine similarity."""
+    def embed_texts(
+        self,
+        texts: List[str],
+        batch_size: int = 32,
+    ) -> List[List[float]]:
+        """Generate dense embeddings using lightweight ONNX inference."""
         if not texts:
             return []
-        embeddings = self.model.encode(
+
+        embeddings = self.model.embed(
             texts,
             batch_size=batch_size,
-            normalize_embeddings=True,
-            show_progress_bar=False,
         )
+
         return [vec.tolist() for vec in embeddings]
 
     def embed_query(self, query: str) -> List[float]:
-        """Embeds a single query string with L2 normalization."""
-        # For bge models, query can be prefixed if desired; bge-small-en-v1.5 performs strongly directly
+        """Generate a single query embedding."""
         clean_q = query.strip()
+
         if not clean_q:
             raise ValueError("Cannot generate embedding for an empty query string.")
-        vec = self.model.encode([clean_q], normalize_embeddings=True)[0]
+
+        vec = next(
+            self.model.embed(
+                [clean_q],
+                batch_size=1,
+            )
+        )
+
         return vec.tolist()
 
 
@@ -86,6 +105,8 @@ _embedding_service_instance: Optional[BaseEmbeddingService] = None
 def get_embedding_service() -> BaseEmbeddingService:
     """Returns the singleton embedding service instance."""
     global _embedding_service_instance
+
     if _embedding_service_instance is None:
         _embedding_service_instance = SentenceTransformerEmbeddingService()
+
     return _embedding_service_instance
