@@ -118,6 +118,10 @@ class LandData(BaseModel):
         default=None,
         description="Physical surface land cover (e.g., dense canopy, grassland, shrubland, bare soil)",
     )
+    crop: Optional[str] = Field(
+        default=None,
+        description="Cultivated crop or crop context (e.g., wheat, maize)",
+    )
 
 
 class BiodiversityData(BaseModel):
@@ -190,7 +194,7 @@ class EnvironmentalData(BaseModel):
 
         soil_keys = {"soil_ph", "soil_organic_carbon", "soil_moisture"}
         climate_keys = {"temperature", "rainfall"}
-        land_keys = {"land_use", "land_cover"}
+        land_keys = {"land_use", "land_cover", "crop"}
         bio_keys = {"species_richness", "habitat_diversity"}
         human_keys = {"pollution", "deforestation"}
         loc_keys = {"region", "latitude", "longitude"}
@@ -204,8 +208,11 @@ class EnvironmentalData(BaseModel):
 
         # Handle crop / cropping system aliases
         for crop_key in ("crop", "crop_type", "cropping_system"):
-            if crop_key in data and "land_use" not in land_dict and "land_use" not in data:
-                land_dict["land_use"] = data[crop_key]
+            if crop_key in data:
+                if "crop" not in land_dict:
+                    land_dict["crop"] = data[crop_key]
+                if "land_use" not in land_dict and "land_use" not in data:
+                    land_dict["land_use"] = data[crop_key]
 
         for k, v in data.items():
             if k in soil_keys and k not in soil_dict:

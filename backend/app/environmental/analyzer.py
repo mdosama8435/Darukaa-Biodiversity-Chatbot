@@ -72,6 +72,18 @@ class EnvironmentalRelationshipAnalyzer:
                 if not any(kw.lower() in context_str for kw in rel.practice_keywords):
                     continue
 
+            # Section 4 Precondition Evaluation: ph_microbial_structure is scientifically grounded in acidification (pH <= 5.5) / neutral diversity
+            if rel.relationship_id == "ph_microbial_structure":
+                ph_obs = flat_data.get("soil_ph")
+                if ph_obs is not None:
+                    try:
+                        ph_float = float(ph_obs)
+                        # Alkaline pH > 7.5 is outside the domain of FAO 2020 acidification relationship
+                        if ph_float > 7.5:
+                            continue
+                    except (ValueError, TypeError):
+                        pass
+
             matched_vars = [v for v in rel.variables if v.lower().strip() in observed_vars]
             missing_vars = [v for v in rel.variables if v.lower().strip() not in observed_vars]
 

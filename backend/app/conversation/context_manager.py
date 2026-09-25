@@ -117,7 +117,7 @@ class EnvironmentalContextManager:
         # 3. Explicit Numeric Environmental Measurements
         # ---------------------------------------------------------------------
         # Soil Organic Carbon (%)
-        soc_match = re.search(r"(?:soc|soil organic carbon)\s*(?:is|=|level is|of)?\s*([0-9]+(?:\.[0-9]+)?)\s*%", lower)
+        soc_match = re.search(r"(?:soc|soil organic carbon)\s*(?:is|=|level is|of|:)?\s*(-?[0-9]+(?:\.[0-9]+)?)\s*%", lower)
         if soc_match and "soil_organic_carbon" not in explicit_unknowns:
             soc_val = float(soc_match.group(1))
             extracted["soil_organic_carbon"] = VariableProvenance(
@@ -131,7 +131,7 @@ class EnvironmentalContextManager:
             )
 
         # Soil pH
-        ph_match = re.search(r"\b(?:soil\s*)?ph\s*(?:is|=|level is)?\s*([0-9]+(?:\.[0-9]+)?)\b", lower)
+        ph_match = re.search(r"\b(?:soil\s*)?ph\s*(?:is|=|level is|of|:)?\s*(-?[0-9]+(?:\.[0-9]+)?)\b", lower)
         if ph_match and "soil_ph" not in explicit_unknowns:
             ph_val = float(ph_match.group(1))
             extracted["soil_ph"] = VariableProvenance(
@@ -145,9 +145,9 @@ class EnvironmentalContextManager:
             )
 
         # Rainfall (mm)
-        rain_match = re.search(r"(?:rainfall|precipitation)\s*(?:is|=|is around|around)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:mm|millimeters)", lower)
+        rain_match = re.search(r"(?:rainfall|precipitation)\s*(?:is|=|is around|around|:)?\s*(-?[0-9]+(?:\.[0-9]+)?)\s*(?:mm|millimeters)", lower)
         if not rain_match:
-            rain_match = re.search(r"\b([0-9]+(?:\.[0-9]+)?)\s*(?:mm|millimeters)\b", lower)
+            rain_match = re.search(r"\b(-?[0-9]+(?:\.[0-9]+)?)\s*(?:mm|millimeters)\b", lower)
         if rain_match and "rainfall" not in explicit_unknowns:
             rain_val = float(rain_match.group(1))
             extracted["rainfall"] = VariableProvenance(
@@ -186,7 +186,7 @@ class EnvironmentalContextManager:
                 )
 
         # Soil Moisture (% or volumetric) - completely independent from rainfall (Condition 3)
-        moist_match = re.search(r"\b(?:soil\s+)?moisture\s*(?:is|=|level is|of)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:%|percent)?\b", lower)
+        moist_match = re.search(r"\b(?:soil\s+)?moisture\s*(?:is|=|level is|of|:)?\s*(-?[0-9]+(?:\.[0-9]+)?)\s*(?:%|percent)?\b", lower)
         if moist_match and "soil_moisture" not in explicit_unknowns:
             moist_val = float(moist_match.group(1))
             extracted["soil_moisture"] = VariableProvenance(
@@ -200,9 +200,18 @@ class EnvironmentalContextManager:
             )
 
         # ---------------------------------------------------------------------
-        # 4. Land Use & Crop Type (Handles Updates e.g. wheat -> maize)
+        # 4. Land Use & Crop Type (Handles Updates e.g. wheat -> maize & Wheat Context)
         # ---------------------------------------------------------------------
-        if "switched from wheat to maize" in lower or "switched to maize" in lower or "grow maize" in lower or "maize this year" in lower or "now grow maize" in lower:
+        if "switched from wheat to maize" in lower or "switched to maize" in lower or "now grow maize" in lower:
+            extracted["crop"] = VariableProvenance(
+                variable="crop",
+                value="maize",
+                unit=None,
+                source="user_statement",
+                turn_id=turn_id,
+                timestamp=now_iso,
+                status=MetricStatus.UPDATED,
+            )
             extracted["land_use"] = VariableProvenance(
                 variable="land_use",
                 value="maize",
@@ -222,6 +231,15 @@ class EnvironmentalContextManager:
                 status=MetricStatus.PROVIDED,
             )
         elif "wheat monoculture" in lower or "monoculture wheat" in lower or ("monoculture" in lower and "wheat" in lower):
+            extracted["crop"] = VariableProvenance(
+                variable="crop",
+                value="wheat",
+                unit=None,
+                source="user_statement",
+                turn_id=turn_id,
+                timestamp=now_iso,
+                status=MetricStatus.PROVIDED,
+            )
             extracted["land_use"] = VariableProvenance(
                 variable="land_use",
                 value="wheat monoculture",
@@ -241,9 +259,86 @@ class EnvironmentalContextManager:
                 status=MetricStatus.PROVIDED,
             )
         elif "grow wheat continuously" in lower or "wheat continuously" in lower or ("grow wheat" in lower and "continuous" in lower) or "continuous wheat" in lower:
+            extracted["crop"] = VariableProvenance(
+                variable="crop",
+                value="wheat",
+                unit=None,
+                source="user_statement",
+                turn_id=turn_id,
+                timestamp=now_iso,
+                status=MetricStatus.PROVIDED,
+            )
             extracted["land_use"] = VariableProvenance(
                 variable="land_use",
                 value="wheat continuous cropping",
+                unit=None,
+                source="user_statement",
+                turn_id=turn_id,
+                timestamp=now_iso,
+                status=MetricStatus.PROVIDED,
+            )
+            extracted["land_cover"] = VariableProvenance(
+                variable="land_cover",
+                value="cropland",
+                unit=None,
+                source="user_statement",
+                turn_id=turn_id,
+                timestamp=now_iso,
+                status=MetricStatus.PROVIDED,
+            )
+        elif any(p in lower for p in ["wheat farm", "wheat field", "wheat cultivation", "wheat cropping"]):
+            # Section 5: Establishes crop context and land use without assuming continuous monoculture
+            extracted["crop"] = VariableProvenance(
+                variable="crop",
+                value="wheat",
+                unit=None,
+                source="user_statement",
+                turn_id=turn_id,
+                timestamp=now_iso,
+                status=MetricStatus.PROVIDED,
+            )
+            extracted["land_use"] = VariableProvenance(
+                variable="land_use",
+                value="wheat cultivation",
+                unit=None,
+                source="user_statement",
+                turn_id=turn_id,
+                timestamp=now_iso,
+                status=MetricStatus.PROVIDED,
+            )
+            extracted["land_cover"] = VariableProvenance(
+                variable="land_cover",
+                value="cropland",
+                unit=None,
+                source="user_statement",
+                turn_id=turn_id,
+                timestamp=now_iso,
+                status=MetricStatus.PROVIDED,
+            )
+        elif any(p in lower for p in ["i grow wheat", "grow wheat", "growing wheat", "we grow wheat"]):
+            # Section 5: "I grow wheat" establishes crop = wheat, but should NOT automatically establish continuous monoculture
+            extracted["crop"] = VariableProvenance(
+                variable="crop",
+                value="wheat",
+                unit=None,
+                source="user_statement",
+                turn_id=turn_id,
+                timestamp=now_iso,
+                status=MetricStatus.PROVIDED,
+            )
+            extracted["land_cover"] = VariableProvenance(
+                variable="land_cover",
+                value="cropland",
+                unit=None,
+                source="user_statement",
+                turn_id=turn_id,
+                timestamp=now_iso,
+                status=MetricStatus.PROVIDED,
+            )
+        elif any(p in lower for p in ["i grow maize", "grow maize", "growing maize", "maize farm", "maize field"]):
+            extracted["crop"] = VariableProvenance(
+                variable="crop",
+                value="maize",
                 unit=None,
                 source="user_statement",
                 turn_id=turn_id,
@@ -306,9 +401,20 @@ class EnvironmentalContextManager:
             )
 
         # ---------------------------------------------------------------------
-        # 6. Biodiversity Indicators
+        # 6. Biodiversity Indicators & Species Richness
         # ---------------------------------------------------------------------
-        if any(p in lower for p in ["biodiversity has been declining", "biodiversity has declined", "biodiversity is declining", "biodiversity declining"]):
+        if any(p in lower for p in ["low species richness", "species richness is low", "low species count"]):
+            extracted["species_richness"] = VariableProvenance(
+                variable="species_richness",
+                value="low",
+                unit=None,
+                source="user_statement",
+                turn_id=turn_id,
+                timestamp=now_iso,
+                status=MetricStatus.PROVIDED,
+                notes="Qualitative low species richness reported by user",
+            )
+        elif any(p in lower for p in ["biodiversity has been declining", "biodiversity has declined", "biodiversity is declining", "biodiversity declining", "poor biodiversity", "low biodiversity"]):
             extracted["habitat_diversity"] = VariableProvenance(
                 variable="habitat_diversity",
                 value="low",
@@ -321,6 +427,86 @@ class EnvironmentalContextManager:
             )
 
         return extracted, explicit_unknowns, None
+
+    @classmethod
+    def validate_candidate_variables(
+        cls,
+        candidate_variables: Dict[str, VariableProvenance],
+    ) -> List[str]:
+        """Validates newly candidate variables BEFORE environmental state mutation.
+        
+        Section 1 Pipeline:
+        Candidate values must be strictly validated before entering active state, provenance,
+        detected updates, or database records. Invalid values return friendly user-facing messages
+        without exposing raw Pydantic errors or stack traces.
+        """
+        errors: List[str] = []
+
+        for var_name, prov in candidate_variables.items():
+            val = prov.value
+            if val is None or prov.status == MetricStatus.UNKNOWN:
+                continue
+
+            # 1. Soil pH (Must be 0 <= pH <= 14)
+            if var_name == "soil_ph":
+                if isinstance(val, (int, float)):
+                    if val < 0.0 or val > 14.0:
+                        clean_v = int(val) if isinstance(val, float) and val.is_integer() else val
+                        errors.append(
+                            f"Soil pH must be between 0 and 14. The value `{clean_v}` is outside the valid measurement range. "
+                            f"Please check the value and provide the corrected pH."
+                        )
+
+            # 2. Soil Moisture (Must be 0 <= moisture <= 100)
+            elif var_name == "soil_moisture":
+                if isinstance(val, (int, float)):
+                    if val < 0.0 or val > 100.0:
+                        clean_v = int(val) if isinstance(val, float) and val.is_integer() else val
+                        errors.append(
+                            f"Soil moisture must be between 0 and 100%. The value `{clean_v}` is outside the valid measurement range. "
+                            f"Please check the value and provide the corrected moisture."
+                        )
+
+            # 3. Soil Organic Carbon (Must be 0 <= SOC <= 100)
+            elif var_name == "soil_organic_carbon":
+                if isinstance(val, (int, float)):
+                    if val < 0.0 or val > 100.0:
+                        clean_v = int(val) if isinstance(val, float) and val.is_integer() else val
+                        errors.append(
+                            f"Soil organic carbon must be between 0 and 100%. The value `{clean_v}` is outside the valid measurement range. "
+                            f"Please check the value and provide the corrected SOC."
+                        )
+
+            # 4. Rainfall (Must be non-negative)
+            elif var_name == "rainfall":
+                if isinstance(val, (int, float)):
+                    if val < 0.0:
+                        clean_v = int(val) if isinstance(val, float) and val.is_integer() else val
+                        errors.append(
+                            f"Rainfall cannot be negative. The value `{clean_v}` is outside the valid measurement range. "
+                            f"Please check the value and provide the corrected rainfall."
+                        )
+
+            # 5. Temperature (Must be between -60 and 70 C)
+            elif var_name == "temperature":
+                if isinstance(val, (int, float)):
+                    if val < -60.0 or val > 70.0:
+                        clean_v = int(val) if isinstance(val, float) and val.is_integer() else val
+                        errors.append(
+                            f"Temperature must be between -60 and 70 °C. The value `{clean_v}` is outside the valid measurement range. "
+                            f"Please check the value and provide the corrected temperature."
+                        )
+
+            # 6. Species Richness (Must be non-negative count if numeric)
+            elif var_name == "species_richness":
+                if isinstance(val, (int, float)):
+                    if val < 0:
+                        clean_v = int(val) if isinstance(val, float) and val.is_integer() else val
+                        errors.append(
+                            f"Species richness count cannot be negative. The value `{clean_v}` is outside the valid measurement range."
+                        )
+
+        return errors
 
     @classmethod
     def merge_context(

@@ -43,14 +43,14 @@ class ScenarioParser:
         lower = text.lower()
 
         # Soil Organic Carbon (%)
-        soc_match = re.search(r"(?:soc|soil organic carbon)\s*(?:is|=|level is|of)?\s*([0-9]+(?:\.[0-9]+)?)\s*%", lower)
+        soc_match = re.search(r"(?:soc|soil organic carbon)\s*(?:is|=|level is|of|:)?\s*(-?[0-9]+(?:\.[0-9]+)?)\s*%", lower)
         if soc_match:
             extracted["soil_organic_carbon"] = float(soc_match.group(1))
 
         # Rainfall (mm)
-        rain_match = re.search(r"(?:annual\s*)?(?:rainfall|precipitation)\s*(?:is|=|of|around|is around)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:mm|millimeters)", lower)
+        rain_match = re.search(r"(?:annual\s*)?(?:rainfall|precipitation)\s*(?:is|=|of|around|is around|:)?\s*(-?[0-9]+(?:\.[0-9]+)?)\s*(?:mm|millimeters)", lower)
         if not rain_match:
-            rain_match = re.search(r"\b([0-9]+(?:\.[0-9]+)?)\s*(?:mm|millimeters)\b", lower)
+            rain_match = re.search(r"\b(-?[0-9]+(?:\.[0-9]+)?)\s*(?:mm|millimeters)\b", lower)
         if rain_match:
             extracted["rainfall"] = float(rain_match.group(1))
 
@@ -68,12 +68,12 @@ class ScenarioParser:
             extracted["land_use"] = "agroforestry"
 
         # Soil pH
-        ph_match = re.search(r"\b(?:soil\s*)?ph\s*(?:is|=|level is)?\s*([0-9]+(?:\.[0-9]+)?)\b", lower)
+        ph_match = re.search(r"\b(?:soil\s*)?ph\s*(?:is|=|level is|of|:)?\s*(-?[0-9]+(?:\.[0-9]+)?)\b", lower)
         if ph_match:
             extracted["soil_ph"] = float(ph_match.group(1))
 
         # Soil Moisture
-        moist_match = re.search(r"\b(?:soil\s*)?moisture\s*(?:is|=|level is)?\s*([0-9]+(?:\.[0-9]+)?)\s*%?", lower)
+        moist_match = re.search(r"\b(?:soil\s*)?moisture\s*(?:is|=|level is|of|:)?\s*(-?[0-9]+(?:\.[0-9]+)?)\s*%?", lower)
         if moist_match:
             extracted["soil_moisture"] = float(moist_match.group(1))
 

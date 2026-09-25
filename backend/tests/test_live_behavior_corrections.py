@@ -445,3 +445,267 @@ def test_issue2_source_terminology_accurate():
     assert "peer-reviewed literature" not in resp.message.lower()
     assert "authoritative scientific and technical sources" in resp.message.lower()
 
+
+# =============================================================================
+# REQUIRED REGRESSION TEST MATRIX (Tests A - I)
+# =============================================================================
+
+def test_matrix_test_a_invalid_ph():
+    """Test A — Invalid pH:
+    Input: soil_ph = 15.5, soc = 0.3%
+    Expected:
+    - friendly validation message
+    - 15.5 NOT persisted
+    - no override record
+    """
+    conv_id = "test_matrix_conv_a"
+    EnvironmentalContextManager._MEMORY_STORE.pop(conv_id, None)
+
+    req = ChatRequest(
+        conversation_id=conv_id,
+        message="My soil pH is 15.5 and SOC is 0.3%"
+    )
+    resp = TurnProcessor.process_turn(req)
+
+    assert resp.validation_error is True, "Expected validation_error to be True"
+    assert "Soil pH must be between 0 and 14" in resp.message
+    assert "15.5" in resp.message
+    assert "Value error" not in resp.message
+    assert "ValidationError" not in resp.message
+
+    # Active context must NOT contain 15.5
+    ctx = EnvironmentalContextManager.get_or_create_context(conv_id)
+    assert "soil_ph" not in ctx.variables or ctx.variables["soil_ph"].value != 15.5
+    # No detected updates
+    assert len(resp.detected_updates or []) == 0
+
+
+def test_matrix_test_b_corrected_ph():
+    """Test B — Corrected pH:
+    Turn 1: soil_ph = 15.5
+    Turn 2: soil_ph = 12.5
+    Expected:
+    - active soil_ph = 12.5
+    - NO 15.5 -> 12.5 override record
+    """
+    conv_id = "test_matrix_conv_b"
+    EnvironmentalContextManager._MEMORY_STORE.pop(conv_id, None)
+
+    # Turn 1: Invalid pH
+    req1 = ChatRequest(conversation_id=conv_id, message="My soil pH is 15.5 and SOC is 0.3%")
+    resp1 = TurnProcessor.process_turn(req1)
+    assert resp1.validation_error is True
+
+    # Turn 2: Corrected pH
+    req2 = ChatRequest(conversation_id=conv_id, message="Actually my soil pH is 12.5")
+    resp2 = TurnProcessor.process_turn(req2)
+    assert resp2.validation_error is False
+
+    ctx = EnvironmentalContextManager.get_or_create_context(conv_id)
+    assert "soil_ph" in ctx.variables
+    assert ctx.variables["soil_ph"].value == 12.5
+
+    # Check update history / detected updates: must NOT show 15.5 -> 12.5
+    for update in (resp2.detected_updates or []):
+        assert update.old_value != 15.5, "15.5 must NOT appear as old_value in detected_updates!"
+        assert update.new_value != 15.5
+
+
+def test_matrix_test_c_low_ph():
+    """Test C — Low pH:
+    soil_ph = 5.5, soc = 0.3
+    Expected:
+    - valid measurement
+    - existing applicable pH relationships may activate
+    """
+    conv_id = "test_matrix_conv_c"
+    EnvironmentalContextManager._MEMORY_STORE.pop(conv_id, None)
+
+    req = ChatRequest(
+        conversation_id=conv_id,
+        message="My soil pH is 5.5 and SOC is 0.3% on my wheat farm with 600 mm rainfall."
+    )
+    resp = TurnProcessor.process_turn(req)
+
+    assert resp.validation_error is False
+    ctx = EnvironmentalContextManager.get_or_create_context(conv_id)
+    assert "soil_ph" in ctx.variables
+    assert ctx.variables["soil_ph"].value == 5.5
+
+    # Check relationships if assessment was generated
+    if resp.assessment and "active_relationships" in resp.assessment:
+        active_rel_ids = [r.get("relationship_id") for r in resp.assessment["active_relationships"]]
+        # Low pH (<= 5.5) satisfies acidic stress precondition
+        assert "ph_microbial_structure" in active_rel_ids or len(active_rel_ids) > 0
+
+
+def test_matrix_test_d_neutral_ph():
+    """Test D — Neutral pH:
+    soil_ph = 7.0, soc = 0.3
+    Expected: valid measurement
+    """
+    conv_id = "test_matrix_conv_d"
+    EnvironmentalContextManager._MEMORY_STORE.pop(conv_id, None)
+
+    req = ChatRequest(
+        conversation_id=conv_id,
+        message="My soil pH is 7.0 and SOC is 0.3%"
+    )
+    resp = TurnProcessor.process_turn(req)
+
+    assert resp.validation_error is False
+    ctx = EnvironmentalContextManager.get_or_create_context(conv_id)
+    assert "soil_ph" in ctx.variables
+    assert ctx.variables["soil_ph"].value == 7.0
+
+
+def test_matrix_test_e_boundary_values():
+    """Test E — Boundary values:
+    pH = 0 and pH = 14: valid
+    pH = -0.1 and pH = 14.1: invalid
+    """
+    # Boundary 0: Valid
+    conv_0 = "test_matrix_conv_e0"
+    EnvironmentalContextManager._MEMORY_STORE.pop(conv_0, None)
+    req_0 = ChatRequest(conversation_id=conv_0, message="My soil pH is 0")
+    resp_0 = TurnProcessor.process_turn(req_0)
+    assert resp_0.validation_error is False
+    ctx_0 = EnvironmentalContextManager.get_or_create_context(conv_0)
+    assert ctx_0.variables["soil_ph"].value == 0.0
+
+    # Boundary 14: Valid
+    conv_14 = "test_matrix_conv_e14"
+    EnvironmentalContextManager._MEMORY_STORE.pop(conv_14, None)
+    req_14 = ChatRequest(conversation_id=conv_14, message="My soil pH is 14")
+    resp_14 = TurnProcessor.process_turn(req_14)
+    assert resp_14.validation_error is False
+    ctx_14 = EnvironmentalContextManager.get_or_create_context(conv_14)
+    assert ctx_14.variables["soil_ph"].value == 14.0
+
+    # Boundary -0.1: Invalid
+    conv_neg = "test_matrix_conv_eneg"
+    EnvironmentalContextManager._MEMORY_STORE.pop(conv_neg, None)
+    req_neg = ChatRequest(conversation_id=conv_neg, message="My soil pH is -0.1")
+    resp_neg = TurnProcessor.process_turn(req_neg)
+    assert resp_neg.validation_error is True
+    ctx_neg = EnvironmentalContextManager.get_or_create_context(conv_neg)
+    assert "soil_ph" not in ctx_neg.variables or ctx_neg.variables["soil_ph"].value != -0.1
+
+    # Boundary 14.1: Invalid
+    conv_high = "test_matrix_conv_ehigh"
+    EnvironmentalContextManager._MEMORY_STORE.pop(conv_high, None)
+    req_high = ChatRequest(conversation_id=conv_high, message="My soil pH is 14.1")
+    resp_high = TurnProcessor.process_turn(req_high)
+    assert resp_high.validation_error is True
+    ctx_high = EnvironmentalContextManager.get_or_create_context(conv_high)
+    assert "soil_ph" not in ctx_high.variables or ctx_high.variables["soil_ph"].value != 14.1
+
+
+def test_matrix_test_f_existing_context_not_corrupted():
+    """Test F — Existing context must not be corrupted:
+    Start with: soil_ph = 6.5, soc = 0.3, rainfall = 600
+    Then send: soil_ph = 15.5
+    Expected: soil_ph remains 6.5. The invalid update must not overwrite the valid previous state.
+    """
+    conv_id = "test_matrix_conv_f"
+    EnvironmentalContextManager._MEMORY_STORE.pop(conv_id, None)
+
+    # Turn 1: Valid initial context
+    req1 = ChatRequest(
+        conversation_id=conv_id,
+        message="My soil pH is 6.5, SOC is 0.3%, and annual rainfall is 600 mm."
+    )
+    resp1 = TurnProcessor.process_turn(req1)
+    assert resp1.validation_error is False
+    ctx1 = EnvironmentalContextManager.get_or_create_context(conv_id)
+    assert ctx1.variables["soil_ph"].value == 6.5
+
+    # Turn 2: Invalid pH update
+    req2 = ChatRequest(
+        conversation_id=conv_id,
+        message="Actually my soil pH is 15.5"
+    )
+    resp2 = TurnProcessor.process_turn(req2)
+    assert resp2.validation_error is True
+
+    # Critical check: Context must still have 6.5
+    ctx2 = EnvironmentalContextManager.get_or_create_context(conv_id)
+    assert ctx2.variables["soil_ph"].value == 6.5, f"Expected 6.5 to be preserved, got {ctx2.variables['soil_ph'].value}"
+    assert ctx2.variables["rainfall"].value == 600.0
+    assert ctx2.variables["soil_organic_carbon"].value == 0.3
+
+
+def test_matrix_test_g_user_provided_wheat_context():
+    """Test G — User-provided wheat context:
+    Input: I have a wheat farm with SOC 0.3%, rainfall 600 mm and low species richness.
+    Expected:
+    - crop = wheat
+    - clarification must NOT ask: 'What crop do you grow?' or 'land use/cropping system'
+    """
+    conv_id = "test_matrix_conv_g"
+    EnvironmentalContextManager._MEMORY_STORE.pop(conv_id, None)
+
+    req = ChatRequest(
+        conversation_id=conv_id,
+        message="I have a wheat farm with SOC 0.3%, rainfall 600 mm and low species richness."
+    )
+    resp = TurnProcessor.process_turn(req)
+
+    ctx = EnvironmentalContextManager.get_or_create_context(conv_id)
+    assert "crop" in ctx.variables, "Expected crop to be extracted into variables"
+    assert ctx.variables["crop"].value == "wheat"
+
+    # Clarification should NOT ask for crop or land use
+    if resp.clarification_questions:
+        for q in resp.clarification_questions:
+            assert "crop" not in q.lower(), f"Did not expect crop question in clarification: {q}"
+            assert "land use" not in q.lower(), f"Did not expect land use question in clarification: {q}"
+
+
+def test_matrix_test_h_no_duplicate_recommendation_rendering():
+    """Test H — No duplicate recommendation rendering:
+    Verify assistant_msg does not contain raw Markdown list duplicates of recommendations.
+    Recommendations should be provided in structured assessment data.
+    """
+    conv_id = "test_matrix_conv_h"
+    EnvironmentalContextManager._MEMORY_STORE.pop(conv_id, None)
+
+    # Provide complete context to generate recommendations
+    req = ChatRequest(
+        conversation_id=conv_id,
+        message="I have a wheat farm with SOC 0.3%, annual rainfall 600 mm, soil pH 5.5, and low species richness."
+    )
+    resp = TurnProcessor.process_turn(req)
+
+    if resp.assessment and resp.assessment.get("recommendations"):
+        recs = resp.assessment["recommendations"]
+        assert len(recs) > 0
+
+        # Message must not contain raw Markdown header for duplicate recommendation listing
+        assert "**Key Evidence-Grounded Recommendations:**" not in resp.message
+        assert "**Key Evidence-Grounded Recommendations**" not in resp.message
+
+
+def test_matrix_test_i_clean_validation_ux():
+    """Test I — Clean validation UX:
+    Verify no raw Pydantic, ValidationError, ValueError, or traceback is visible to the user.
+    """
+    conv_id = "test_matrix_conv_i"
+    EnvironmentalContextManager._MEMORY_STORE.pop(conv_id, None)
+
+    req = ChatRequest(
+        conversation_id=conv_id,
+        message="My soil pH is 15.5"
+    )
+    resp = TurnProcessor.process_turn(req)
+
+    assert resp.validation_error is True
+    msg = resp.message
+
+    assert "pydantic" not in msg.lower()
+    assert "validationerror" not in msg.lower()
+    assert "value error" not in msg.lower()
+    assert "traceback" not in msg.lower()
+    assert "Soil pH must be between 0 and 14" in msg
+
+

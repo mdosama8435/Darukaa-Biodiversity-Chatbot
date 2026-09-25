@@ -72,33 +72,42 @@ def _extract_from_text(text: str) -> Dict[str, Any]:
     lower = text.lower()
 
     # Soil Organic Carbon
-    soc_num = re.search(r"(?:soc|soil organic carbon)\s*(?:is|=|level is|of)?\s*([0-9]+(?:\.[0-9]+)?)\s*%", lower)
+    soc_num = re.search(r"(?:soc|soil organic carbon)\s*(?:is|=|level is|of|:)?\s*(-?[0-9]+(?:\.[0-9]+)?)\s*%", lower)
     if soc_num:
         extracted["soil_organic_carbon"] = float(soc_num.group(1))
     elif "low soil organic carbon" in lower or "low soc" in lower or "depleted soc" in lower:
         extracted["soil_organic_carbon"] = 0.3  # heuristic indicator
 
     # Soil pH
-    ph_match = re.search(r"\bph\s*(?:is|=|level is)?\s*([0-9]+(?:\.[0-9]+)?)\b", lower)
+    ph_match = re.search(r"\b(?:soil\s*)?ph\s*(?:is|=|level is|of|:)?\s*(-?[0-9]+(?:\.[0-9]+)?)\b", lower)
     if ph_match:
         extracted["soil_ph"] = float(ph_match.group(1))
 
     # Rainfall
-    rain_mm = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*(?:mm|millimeters)", lower)
+    rain_mm = re.search(r"(-?[0-9]+(?:\.[0-9]+)?)\s*(?:mm|millimeters)", lower)
     if rain_mm:
         extracted["rainfall"] = float(rain_mm.group(1))
     elif any(p in lower for p in ["low rainfall", "rainfall is low", "rainfall low", "precipitation deficit", "drought"]):
         extracted["rainfall"] = 400.0  # heuristic indicator for dryland
 
-    # Land use
-    if "wheat monoculture" in lower:
+    # Land use & Crop Context (Section 5)
+    if "wheat monoculture" in lower or "monoculture wheat" in lower or ("monoculture" in lower and "wheat" in lower):
+        extracted["crop"] = "wheat"
         extracted["land_use"] = "wheat monoculture"
+        extracted["land_cover"] = "cropland"
+    elif "grow wheat continuously" in lower or "wheat continuously" in lower or "continuous wheat" in lower:
+        extracted["crop"] = "wheat"
+        extracted["land_use"] = "continuous wheat cropping"
+        extracted["land_cover"] = "cropland"
+    elif any(p in lower for p in ["wheat farm", "wheat field", "wheat cultivation", "wheat cropping"]):
+        extracted["crop"] = "wheat"
+        extracted["land_use"] = "wheat cultivation"
+        extracted["land_cover"] = "cropland"
+    elif any(p in lower for p in ["i grow wheat", "grow wheat", "growing wheat", "we grow wheat"]):
+        extracted["crop"] = "wheat"
         extracted["land_cover"] = "cropland"
     elif "monoculture" in lower:
         extracted["land_use"] = "monoculture"
-    elif "wheat" in lower and ("continuous" in lower or "grow" in lower):
-        extracted["land_use"] = "continuous wheat cropping"
-        extracted["land_cover"] = "cropland"
     elif "agroforestry" in lower:
         extracted["land_use"] = "agroforestry"
 
@@ -112,7 +121,9 @@ def _extract_from_text(text: str) -> Dict[str, Any]:
         extracted["region"] = "arid"
 
     # Habitat / Biodiversity indicators
-    if "biodiversity has declined" in lower or "biodiversity is declining" in lower or "declined" in lower:
+    if any(p in lower for p in ["low species richness", "species richness is low", "low species count"]):
+        extracted["species_richness"] = "low"
+    elif any(p in lower for p in ["biodiversity has declined", "biodiversity is declining", "poor biodiversity", "low biodiversity", "declined"]):
         extracted["habitat_diversity"] = "low"
 
     return extracted
@@ -161,14 +172,20 @@ def validate_environmental_state(state: EnvironmentalState) -> Dict[str, Any]:
     provided = env_instance.get_provided_fields()
     missing = env_instance.get_missing_fields()
 
-    # Check driving decision variables (SOC, Rainfall, Land Use)
-    driving_vars = ["soil_organic_carbon", "rainfall", "land_use"]
-    provided_driving = [v for v in driving_vars if flat_data.get(v) is not None]
+    # Check driving decision variables (SOC, Rainfall, Land Use / Crop)
+    has_land_or_crop = flat_data.get("land_use") is not None or flat_data.get("crop") is not None
+    provided_driving = []
+    if flat_data.get("soil_organic_carbon") is not None:
+        provided_driving.append("soil_organic_carbon")
+    if flat_data.get("rainfall") is not None:
+        provided_driving.append("rainfall")
+    if has_land_or_crop:
+        provided_driving.append("land_use")
 
     # If fewer than 2 driving variables are present, cannot formulate grounded ecological reasoning (Bug 1 / Condition 1)
     if len(provided_driving) < 2:
         clarification_questions = []
-        if flat_data.get("land_use") is None:
+        if not has_land_or_crop:
             clarification_questions.append(
                 "What type of land use or cropping system do you currently have (e.g., continuous wheat monoculture, pasture)?"
             )

@@ -149,13 +149,38 @@ class RecommendationGenerator:
             ]
 
             limitations = [
-                "Species selection requires local agronomic and ecological validation; species must be adapted to local water table and salinity.",
-                "Initial tree sapling establishment requires protected moisture management during the first 1-2 dry seasons.",
+                "Requires local agronomic validation and careful species selection to minimize light and water competition with primary crops.",
+                "Initial establishment phase requires protection from grazing pressure during years 1-2.",
             ]
-            if is_water_limited:
-                limitations.append(
-                    "High-water-demand tree species must be avoided in semi-arid conditions to prevent competitive water depletion with understory crops."
-                )
+
+            # Section 4: Evaluate soil pH participation in reasoning
+            ph_float = None
+            if soil_ph is not None:
+                try:
+                    ph_float = float(soil_ph)
+                except (ValueError, TypeError):
+                    pass
+
+            if ph_float is not None:
+                if ph_float <= 5.5:
+                    reasoning_steps.append(
+                        EnvironmentalReasoningStep(
+                            variables=["soil_ph", "species_richness"],
+                            relationship="ph_microbial_structure",
+                            explanation=(
+                                f"Observed acidic soil pH ({ph_float}) induces aluminum and proton toxicity that restricts microbial "
+                                "taxa richness. Agroforestry leaf litter inputs and perennial root turnover supply organic anions that "
+                                "biologically buffer rhizosphere acidity."
+                            ),
+                        )
+                    )
+                    limitations.append(
+                        f"At soil pH {ph_float}, soil acidity and aluminum availability require selecting acid-tolerant tree and companion crop varieties."
+                    )
+                elif ph_float > 7.5:
+                    limitations.append(
+                        f"Soil pH {ph_float} indicates strongly alkaline conditions. The current verified scientific corpus (FAO/IPCC) lacks sufficient empirical evidence for a pH-specific intervention; recommendations focus on soil organic substrate replenishment."
+                    )
 
             # Link matching evidence
             matched_evidence = [
@@ -169,9 +194,9 @@ class RecommendationGenerator:
                 environmental_reasoning=reasoning_steps,
                 impacted_metrics=["soil_organic_carbon", "species_richness", "habitat_diversity", "soil_moisture"],
                 time_horizon=TimeHorizon(
-                    short_term="0-1 years: Establishment of drought-adapted tree lines, cover crops, and baseline mulching.",
-                    medium_term="1-3 years: Fine-root biomass accumulation, improved infiltration, and macrofauna recovery.",
-                    long_term="3-7+ years: Stabilized macro-aggregate soil carbon stocks and multi-trophic biodiversity resilience.",
+                    short_term="Action initiation (0-1 yr): Establishment of drought-adapted tree lines, cover crops, and baseline mulching.",
+                    medium_term="Ecological response (1-3 yrs): Fine-root biomass accumulation, improved infiltration, and macrofauna recovery.",
+                    long_term="System stabilization (3-7+ yrs): Stabilized macro-aggregate soil carbon stocks and multi-trophic biodiversity resilience.",
                 ),
                 expected_effect=ExpectedEffect(
                     description="Evidence suggests positive improvement in soil organic carbon stocks and taxonomic richness.",
@@ -189,6 +214,26 @@ class RecommendationGenerator:
         # (Addresses SOC + Moisture retention + Thermal stress)
         # ---------------------------------------------------------------------
         if is_low_soc or is_water_limited:
+            cand2_limitations = [
+                "Residue retention requires specialized no-till seeding equipment to avoid sowing blockage.",
+                "In termite-dense semi-arid areas, decomposition rates must be monitored.",
+            ]
+            ph_float = None
+            if soil_ph is not None:
+                try:
+                    ph_float = float(soil_ph)
+                except (ValueError, TypeError):
+                    pass
+            if ph_float is not None:
+                if ph_float <= 5.5:
+                    cand2_limitations.append(
+                        f"At acidic soil pH {ph_float}, residue decomposition dynamics and Rhizobia activity must be monitored."
+                    )
+                elif ph_float > 7.5:
+                    cand2_limitations.append(
+                        f"At alkaline soil pH {ph_float}, evidence is insufficient for pH-specific amendments; surface residue provides general moisture and carbon protection."
+                    )
+
             cand2 = RecommendationItem(
                 action="Continuous Organic Residue Retention and Surface Mulching",
                 why=[
@@ -208,9 +253,9 @@ class RecommendationGenerator:
                 ],
                 impacted_metrics=["soil_organic_carbon", "soil_moisture", "species_richness"],
                 time_horizon=TimeHorizon(
-                    short_term="0-6 months: Suppression of evaporative soil moisture loss and surface crust formation.",
-                    medium_term="6-24 months: Increased microbial biomass carbon and improved aggregate water stability.",
-                    long_term="2-5 years: Elevated topsoil organic matter horizons and fungal-to-bacterial biomass ratios.",
+                    short_term="Action initiation (0-6 mo): Suppression of evaporative soil moisture loss and surface crust formation.",
+                    medium_term="Ecological response (6-24 mo): Increased microbial biomass carbon and improved aggregate water stability.",
+                    long_term="System stabilization (2-5 yrs): Elevated topsoil organic matter horizons and fungal-to-bacterial biomass ratios.",
                 ),
                 expected_effect=ExpectedEffect(
                     description="Associated with enhanced soil moisture retention and microbial biomass protection.",
@@ -222,10 +267,7 @@ class RecommendationGenerator:
                     e for e in evidence_items
                     if any(v in e.matched_variables for v in ["soil_organic_carbon", "soil_moisture", "rainfall"])
                 ][:3],
-                limitations=[
-                    "Residue retention requires specialized no-till seeding equipment to avoid sowing blockage.",
-                    "In termite-dense semi-arid areas, decomposition rates must be monitored.",
-                ],
+                limitations=cand2_limitations,
             )
             candidates.append(cand2)
 

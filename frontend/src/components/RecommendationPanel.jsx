@@ -9,6 +9,7 @@ import {
   GitCommit,
   CheckCircle2,
 } from 'lucide-react';
+import { cleanText } from './ChatView';
 
 export default function RecommendationPanel({ recommendations = [] }) {
   const [expandedTrace, setExpandedTrace] = useState({});
@@ -82,7 +83,7 @@ export default function RecommendationPanel({ recommendations = [] }) {
                     Action {idx + 1}
                   </span>
                   <h3 className="text-sm sm:text-base font-bold text-white tracking-tight leading-snug">
-                    {rec.action}
+                    {cleanText(rec.action)}
                   </h3>
                 </div>
 
@@ -104,7 +105,7 @@ export default function RecommendationPanel({ recommendations = [] }) {
                   <ul className="space-y-1 text-xs text-slate-300 font-serif list-disc list-inside">
                     {rec.why.map((w, wIdx) => (
                       <li key={wIdx} className="leading-relaxed">
-                        {w}
+                        {cleanText(w)}
                       </li>
                     ))}
                   </ul>
@@ -123,7 +124,7 @@ export default function RecommendationPanel({ recommendations = [] }) {
                         key={m}
                         className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700/80 text-[11px] font-mono text-emerald-300 capitalize"
                       >
-                        {m.replace(/_/g, ' ')}
+                        {cleanText(m.replace(/_/g, ' '))}
                       </span>
                     ))}
                   </div>
@@ -136,7 +137,7 @@ export default function RecommendationPanel({ recommendations = [] }) {
                   <strong className="text-[11px] font-mono text-slate-400 block mb-0.5">
                     Expected Ecological Effect:
                   </strong>
-                  {rec.expected_effect.description}
+                  {cleanText(rec.expected_effect.description)}
                 </div>
               )}
 
@@ -147,26 +148,39 @@ export default function RecommendationPanel({ recommendations = [] }) {
                     <Clock className="w-3 h-3 text-slate-400" />
                     <span>Time Horizon:</span>
                   </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-serif">
-                    {rec.time_horizon.short_term && (
+                  {rec.time_horizon.action_initiation || rec.time_horizon.expected_ecological_response ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-serif">
                       <div className="p-2 rounded bg-slate-950 border border-slate-800">
-                        <strong className="text-emerald-400 font-mono text-[10px] block">Short-Term:</strong>
-                        <span className="text-slate-300">{rec.time_horizon.short_term}</span>
+                        <strong className="text-emerald-400 font-mono text-[10px] block">Action Initiation:</strong>
+                        <span className="text-slate-300">{cleanText(rec.time_horizon.action_initiation || 'Immediate (0–1 year)')}</span>
                       </div>
-                    )}
-                    {rec.time_horizon.medium_term && (
                       <div className="p-2 rounded bg-slate-950 border border-slate-800">
-                        <strong className="text-teal-400 font-mono text-[10px] block">Medium-Term:</strong>
-                        <span className="text-slate-300">{rec.time_horizon.medium_term}</span>
+                        <strong className="text-teal-400 font-mono text-[10px] block">Expected Ecological Response:</strong>
+                        <span className="text-slate-300">{cleanText(rec.time_horizon.expected_ecological_response || 'Gradual (Site dependent)')}</span>
                       </div>
-                    )}
-                    {rec.time_horizon.long_term && (
-                      <div className="p-2 rounded bg-slate-950 border border-slate-800">
-                        <strong className="text-cyan-400 font-mono text-[10px] block">Long-Term:</strong>
-                        <span className="text-slate-300">{rec.time_horizon.long_term}</span>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-serif">
+                      {rec.time_horizon.short_term && (
+                        <div className="p-2 rounded bg-slate-950 border border-slate-800">
+                          <strong className="text-emerald-400 font-mono text-[10px] block">Short-Term:</strong>
+                          <span className="text-slate-300">{cleanText(String(rec.time_horizon.short_term))}</span>
+                        </div>
+                      )}
+                      {rec.time_horizon.medium_term && (
+                        <div className="p-2 rounded bg-slate-950 border border-slate-800">
+                          <strong className="text-teal-400 font-mono text-[10px] block">Medium-Term:</strong>
+                          <span className="text-slate-300">{cleanText(String(rec.time_horizon.medium_term))}</span>
+                        </div>
+                      )}
+                      {rec.time_horizon.long_term && (
+                        <div className="p-2 rounded bg-slate-950 border border-slate-800">
+                          <strong className="text-cyan-400 font-mono text-[10px] block">Long-Term:</strong>
+                          <span className="text-slate-300">{cleanText(String(rec.time_horizon.long_term))}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -179,7 +193,7 @@ export default function RecommendationPanel({ recommendations = [] }) {
                   </div>
                   <ul className="list-disc list-inside text-slate-300 text-[11px] space-y-0.5">
                     {rec.limitations.map((l, lIdx) => (
-                      <li key={lIdx}>{l}</li>
+                      <li key={lIdx}>{cleanText(l)}</li>
                     ))}
                   </ul>
                 </div>

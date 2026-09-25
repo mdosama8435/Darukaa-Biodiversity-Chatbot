@@ -4,6 +4,7 @@ import {
   Sparkles,
   HelpCircle,
   AlertCircle,
+  AlertTriangle,
   RefreshCw,
   CheckCircle2,
   ExternalLink,
@@ -13,7 +14,31 @@ import {
   ShieldCheck,
   Clock,
   ArrowRight,
+  BookOpen,
 } from 'lucide-react';
+
+export function cleanText(str) {
+  if (!str || typeof str !== 'string') return '';
+  return str
+    .replace(/&#x20;/g, ' ')
+    .replace(/\\:/g, ':')
+    .replace(/\*\*/g, '')
+    .trim();
+}
+
+export function cleanErrorMessage(err) {
+  if (!err) return null;
+  const errStr = typeof err === 'string' ? err : (err.message || String(err));
+  if (
+    errStr.includes('ValidationError') ||
+    errStr.includes('Value error') ||
+    errStr.includes('Traceback') ||
+    errStr.includes('pydantic')
+  ) {
+    return 'Invalid measurement provided. Please check the values and provide a valid measurement.';
+  }
+  return cleanText(errStr);
+}
 
 export default function ChatView({
   chatMessages = [],
@@ -155,7 +180,7 @@ export default function ChatView({
                       : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none shadow-xs'
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  <p className="whitespace-pre-wrap">{cleanText(msg.content)}</p>
 
                   {/* Clarification Questions (Level 2) */}
                   {!isUser && msg.clarification_questions && msg.clarification_questions.length > 0 && (
@@ -172,7 +197,7 @@ export default function ChatView({
                             className="text-left text-xs text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-2 rounded-lg border border-amber-500/20 transition-colors flex items-start space-x-2"
                           >
                             <span className="text-amber-400 font-bold">•</span>
-                            <span>{q}</span>
+                            <span>{cleanText(q)}</span>
                           </button>
                         ))}
                       </div>
@@ -244,58 +269,134 @@ export default function ChatView({
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-1.5 text-xs font-mono font-bold text-emerald-400 uppercase">
                           <ShieldCheck className="w-4 h-4" />
-                          <span>Recommendation</span>
+                          <span>Recommendations</span>
                         </div>
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold uppercase">
                           Confidence: {msg.confidence || 'Medium'}
                         </span>
                       </div>
 
-                      {recommendations.map((rec, rIdx) => (
-                        <div
-                          key={rIdx}
-                          className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs"
-                        >
-                          <div className="font-bold text-slate-100 text-[13px]">
-                            {rec.action}
-                          </div>
+                      {recommendations.map((rec, rIdx) => {
+                        const recConf = (rec.confidence || msg.confidence || 'Medium').toUpperCase();
+                        const confBadgeClass =
+                          recConf === 'HIGH'
+                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                            : recConf === 'MEDIUM'
+                            ? 'bg-teal-500/15 text-teal-300 border-teal-500/30'
+                            : recConf === 'LOW'
+                            ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                            : 'bg-rose-500/15 text-rose-300 border-rose-500/30';
 
-                          {rec.why && rec.why.length > 0 && (
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] font-mono uppercase text-slate-400 font-semibold">
-                                Why:
+                        return (
+                          <div
+                            key={rIdx}
+                            className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5 text-xs"
+                          >
+                            {/* Action Header & Confidence */}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="font-bold text-slate-100 text-[13px]">
+                                {cleanText(rec.action)}
+                              </div>
+                              <span
+                                className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded border uppercase shrink-0 ${confBadgeClass}`}
+                              >
+                                {recConf}
                               </span>
-                              <p className="text-slate-300 font-serif text-xs leading-relaxed">
-                                {rec.why[0]}
-                              </p>
                             </div>
-                          )}
 
-                          {rec.impacted_metrics && rec.impacted_metrics.length > 0 && (
-                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                              <span className="text-[10px] font-mono text-slate-400">Impacted:</span>
-                              {rec.impacted_metrics.map((m) => (
-                                <span
-                                  key={m}
-                                  className="px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-emerald-300"
-                                >
-                                  {m.replace(/_/g, ' ')}
+                            {/* Why */}
+                            {rec.why && rec.why.length > 0 && (
+                              <div className="space-y-0.5">
+                                <span className="text-[10px] font-mono uppercase text-slate-400 font-semibold">
+                                  Why:
                                 </span>
-                              ))}
-                            </div>
-                          )}
+                                {rec.why.map((w, wIdx) => (
+                                  <p key={wIdx} className="text-slate-300 font-serif text-xs leading-relaxed">
+                                    {cleanText(w)}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
 
-                          {rec.time_horizon && (
-                            <div className="text-[11px] font-mono text-slate-400 pt-1 border-t border-slate-800/60 flex items-center space-x-2">
-                              <Clock className="w-3 h-3 text-slate-500" />
-                              <span>Horizon:</span>
-                              <span className="text-slate-300">
-                                {rec.time_horizon.short_term ? 'Short-term' : 'Medium-term'}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                            {/* Impacted Metrics */}
+                            {rec.impacted_metrics && rec.impacted_metrics.length > 0 && (
+                              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                <span className="text-[10px] font-mono text-slate-400">Impacted Metrics:</span>
+                                {rec.impacted_metrics.map((m) => (
+                                  <span
+                                    key={m}
+                                    className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-emerald-300"
+                                  >
+                                    {cleanText(m.replace(/_/g, ' '))}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Time Horizon */}
+                            {rec.time_horizon && (
+                              <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/70 space-y-1.5 text-xs">
+                                <div className="text-[10px] font-mono font-semibold text-slate-400 flex items-center space-x-1.5 uppercase">
+                                  <Clock className="w-3 h-3 text-slate-400" />
+                                  <span>Time Horizon:</span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-serif">
+                                  <div>
+                                    <span className="text-[10px] font-mono text-slate-400 block">Action Initiation:</span>
+                                    <span className="text-slate-200">
+                                      {cleanText(
+                                        rec.time_horizon.action_initiation ||
+                                        (rec.time_horizon.short_term ? 'Immediate (0–1 year)' : 'Site dependent')
+                                      )}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] font-mono text-slate-400 block">Expected Ecological Response:</span>
+                                    <span className="text-slate-200">
+                                      {cleanText(
+                                        rec.time_horizon.expected_ecological_response ||
+                                        (rec.time_horizon.medium_term ? 'Medium-term (1–3 years)' :
+                                         rec.time_horizon.long_term ? 'Long-term (3–7+ years)' :
+                                         rec.time_horizon.description || 'Gradual response based on site conditions')
+                                      )}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Supporting Evidence */}
+                            {((rec.supporting_evidence && rec.supporting_evidence.length > 0) || (rec.traceability?.chunk_ids?.length > 0)) && (
+                              <div className="text-[11px] font-mono text-slate-400 pt-1 flex items-start space-x-1.5">
+                                <BookOpen className="w-3.5 h-3.5 text-slate-500 mt-0.5 shrink-0" />
+                                <div>
+                                  <span className="font-semibold text-slate-300">Evidence: </span>
+                                  <span className="text-slate-400">
+                                    {rec.supporting_evidence && rec.supporting_evidence.length > 0
+                                      ? rec.supporting_evidence.map((e) => cleanText(e)).join(', ')
+                                      : `Corpus Chunks: ${rec.traceability?.chunk_ids?.join(', ') || 'Authoritative evidence'}`}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Limitations */}
+                            {rec.limitations && rec.limitations.length > 0 && (
+                              <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs font-serif space-y-1">
+                                <div className="text-[10px] font-mono font-semibold text-amber-400 flex items-center space-x-1 uppercase">
+                                  <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                                  <span>Site-Specific Limitations:</span>
+                                </div>
+                                <ul className="list-disc list-inside text-slate-300 text-[11px] space-y-0.5">
+                                  {rec.limitations.map((l, lIdx) => (
+                                    <li key={lIdx}>{cleanText(l)}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -348,9 +449,7 @@ export default function ChatView({
               <div>
                 <div className="font-semibold text-rose-200">Request Error</div>
                 <div className="font-serif mt-0.5 text-[11px] text-rose-300/90">
-                  {chatError.length > 120
-                    ? 'Something went wrong while analyzing your environmental request. Please check connectivity or try again.'
-                    : chatError}
+                  {cleanErrorMessage(chatError)}
                 </div>
               </div>
             </div>

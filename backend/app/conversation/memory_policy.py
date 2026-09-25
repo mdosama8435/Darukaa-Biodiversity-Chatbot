@@ -29,13 +29,20 @@ class MemoryPolicy:
         if not clarification_candidates:
             return False, "sufficient_parameters"
 
-        # Check genuinely provided driving variables (SOC, rainfall, land_use)
+        # Check genuinely provided driving variables (SOC, rainfall, land_use/crop)
         provided_driving = [
-            v for v in cls.DRIVING_VARIABLES
+            v for v in ["soil_organic_carbon", "rainfall"]
             if v in context.variables
             and context.variables[v].value is not None
             and context.variables[v].status != MetricStatus.UNKNOWN
         ]
+        if any(
+            k in context.variables
+            and context.variables[k].value is not None
+            and context.variables[k].status != MetricStatus.UNKNOWN
+            for k in ["land_use", "crop", "land_cover"]
+        ):
+            provided_driving.append("land_use")
 
         # 1. Full 3-variable challenge-level multi-metric threshold met
         if len(provided_driving) >= 3:

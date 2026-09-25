@@ -155,6 +155,20 @@ class TurnProcessor:
                 turn_id=current_turn,
                 active_context=context,
             )
+            v_errs = EnvironmentalContextManager.validate_candidate_variables(extracted_vars)
+            if v_errs:
+                return ChatResponse(
+                    conversation_id=conv_id,
+                    turn_id=current_turn,
+                    role="assistant",
+                    message="\n".join(v_errs),
+                    status="validation_error",
+                    validation_error=True,
+                    environmental_context=cls._format_context_summary(context),
+                    detected_updates=[],
+                    confidence="insufficient",
+                )
+
             updates = []
             if extracted_vars:
                 context, updates = EnvironmentalContextManager.merge_context(
@@ -206,11 +220,25 @@ class TurnProcessor:
                         new_provs[k] = VariableProvenance(
                             variable=k,
                             value=v,
-                            unit="%" if k in ("soil_organic_carbon", "soil_moisture") else ("mm" if k == "rainfall" else None),
+                            unit="%" if k in ("soil_organic_carbon", "soil_moisture") else ("mm" if k == "rainfall" else ("pH" if k == "soil_ph" else None)),
                             source="user_statement",
                             turn_id=current_turn,
                             timestamp=now_iso,
                             status=MetricStatus.PROVIDED,
+                        )
+                    # Validate candidate preamble variables before mutation
+                    v_errs = EnvironmentalContextManager.validate_candidate_variables(new_provs)
+                    if v_errs:
+                        return ChatResponse(
+                            conversation_id=conv_id,
+                            turn_id=current_turn,
+                            role="assistant",
+                            message="\n".join(v_errs),
+                            status="validation_error",
+                            validation_error=True,
+                            environmental_context=cls._format_context_summary(context),
+                            detected_updates=[],
+                            confidence="insufficient",
                         )
                     context, _ = EnvironmentalContextManager.merge_context(context, new_provs, current_turn)
 
@@ -310,7 +338,28 @@ class TurnProcessor:
                 detected_updates=[],
             )
 
-        # 3. Merge newly provided variables into persistent context
+        # Section 1 Pipeline: Validate candidate variables BEFORE ANY STATE MUTATION
+        validation_errors = EnvironmentalContextManager.validate_candidate_variables(extracted_vars)
+        if validation_errors:
+            # DO NOT persist value
+            # DO NOT update provenance
+            # DO NOT update environmental context
+            # DO NOT include value in active state
+            # DO NOT create override record
+            friendly_validation_msg = "\n".join(validation_errors)
+            return ChatResponse(
+                conversation_id=conv_id,
+                turn_id=current_turn,
+                role="assistant",
+                message=friendly_validation_msg,
+                status="validation_error",
+                validation_error=True,
+                environmental_context=cls._format_context_summary(context),
+                detected_updates=[],
+                confidence="insufficient",
+            )
+
+        # 3. Merge newly provided variables into persistent context ONLY IF VALID
         context, updates = EnvironmentalContextManager.merge_context(
             current_context=context,
             new_variables=extracted_vars,
@@ -359,13 +408,23 @@ class TurnProcessor:
             elif updates:
                 update_items = [f"{u.variable.replace('_', ' ')} as {u.new_value}" for u in updates]
                 ack_prefix = f"Recorded {', '.join(update_items)}.\n\n"
+            elif "crop" in extracted_vars and extracted_vars["crop"].value is not None:
+                ack_prefix = f"Recorded crop as {extracted_vars['crop'].value}.\n\n"
             elif "land_use" in extracted_vars and extracted_vars["land_use"].value is not None:
                 ack_prefix = f"Recorded land use as {extracted_vars['land_use'].value}.\n\n"
 
-            clarification_message = (
-                f"{ack_prefix}To formulate a scientifically grounded multi-metric assessment for your land, I need a few additional details:\n\n"
-                + "\n".join([f"• {q}" for q in questions_list])
-            )
+            # Section 6: Smart Clarification - adaptive formatting across turns
+            if context.clarification_depth > 1:
+                short_bullets = [f"• {q.short_label or q.question}" for q in candidate_questions]
+                clarification_message = (
+                    f"{ack_prefix}I can help assess that. I still need:\n"
+                    + "\n".join(short_bullets)
+                )
+            else:
+                clarification_message = (
+                    f"{ack_prefix}To formulate a scientifically grounded multi-metric assessment for your land, I need a few additional details:\n\n"
+                    + "\n".join([f"• {q}" for q in questions_list])
+                )
 
             return ChatResponse(
                 conversation_id=conv_id,
@@ -401,7 +460,7 @@ class TurnProcessor:
                 conversation_id=conv_id,
                 turn_id=current_turn,
                 role="assistant",
-                message=f"An error occurred during ecological analysis: {exc}",
+                message="An unexpected issue occurred while analyzing environmental parameters. Please verify your input and try again.",
                 status="error",
                 environmental_context=cls._format_context_summary(context),
             )
@@ -427,28 +486,34 @@ class TurnProcessor:
             )
 
         # Synthesize conversational explanation of recommendations
-        recs = phase3_response.get("recommendations") or []
+        # Section 7: Remove duplicate raw Markdown representation; recommendations are returned in structured assessment.
         conf = phase3_response.get("confidence", "medium")
         compound = phase3_response.get("assessment", {}).get("compound_synthesis")
 
         message_parts = []
         if compound:
             message_parts.append(compound)
+        else:
+            message_parts.append("Environmental assessment completed based on your verified farm parameters.")
 
-        if recs:
-            message_parts.append("\n**Key Evidence-Grounded Recommendations:**")
-            for i, r in enumerate(recs[:2], start=1):
-                message_parts.append(f"{i}. **{r['action']}**")
-                if r.get("why"):
-                    message_parts.append(f"   • *Rationale:* {r['why'][0]}")
-                if r.get("expected_effect", {}).get("description"):
-                    message_parts.append(f"   • *Expected Impact:* {r['expected_effect']['description']}")
+        # Section 4: If soil pH is provided, verify whether corpus supports pH-specific intervention
+        ph_prov = context.variables.get("soil_ph")
+        if ph_prov and ph_prov.value is not None:
+            try:
+                ph_num = float(ph_prov.value)
+                if ph_num > 7.5:
+                    message_parts.append(
+                        f"\nNote: The verified scientific corpus (FAO 2020 / IPCC 2019) does not contain sufficient empirical evidence "
+                        f"for a specific agroecological intervention at alkaline pH {ph_num}. Formulated interventions address organic matter and soil health."
+                    )
+            except (ValueError, TypeError):
+                pass
 
         if updates:
             update_notes = ", ".join([f"{u.variable}: {u.old_value} → {u.new_value}" for u in updates])
             message_parts.append(f"\n*(Updated in this turn: {update_notes})*")
 
-        assistant_msg = "\n".join(message_parts) if message_parts else "Environmental assessment completed."
+        assistant_msg = "\n".join(message_parts)
 
         return ChatResponse(
             conversation_id=conv_id,

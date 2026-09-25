@@ -121,7 +121,7 @@ def classify_metric(variable: str, value: Any) -> Optional[MetricClassification]
         except (ValueError, TypeError):
             return None
 
-        if val_float < 5.5:
+        if val_float <= 5.5:
             return MetricClassification(
                 variable=variable,
                 observed_value=val_float,

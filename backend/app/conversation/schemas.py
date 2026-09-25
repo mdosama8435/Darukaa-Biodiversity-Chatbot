@@ -66,6 +66,7 @@ class ClarificationQuestionItem(BaseModel):
     target_variable: str
     priority: int = 1
     rationale: str
+    short_label: Optional[str] = None
 
 
 class ChatRequest(BaseModel):
@@ -87,7 +88,11 @@ class ChatResponse(BaseModel):
     message: str
     status: str = Field(
         default="completed",
-        description="'clarification_needed' | 'completed' | 'insufficient_evidence' | 'error'",
+        description="'clarification_needed' | 'completed' | 'insufficient_evidence' | 'error' | 'validation_error'",
+    )
+    validation_error: bool = Field(
+        default=False,
+        description="True if input contained invalid environmental measurement values",
     )
     clarification_questions: List[str] = Field(default_factory=list)
     environmental_context: Dict[str, Any] = Field(default_factory=dict)
